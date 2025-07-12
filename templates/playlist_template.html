@@ -212,6 +212,123 @@
             margin-right: 8px;
         }
 
+        .soundcloud-section {
+            background: #f8fafc;
+            padding: 30px;
+            border-top: 1px solid #e2e8f0;
+        }
+
+        .soundcloud-header {
+            text-align: center;
+            margin-bottom: 25px;
+        }
+
+        .soundcloud-header h3 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #1e293b;
+            margin-bottom: 10px;
+        }
+
+        .soundcloud-description {
+            color: #64748b;
+            font-size: 1rem;
+        }
+
+        .soundcloud-actions {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .soundcloud-button {
+            background: linear-gradient(135deg, #ff5500 0%, #ff8800 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 50px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            box-shadow: 0 4px 15px rgba(255, 85, 0, 0.3);
+        }
+
+        .soundcloud-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(255, 85, 0, 0.4);
+        }
+
+        .soundcloud-button:active {
+            transform: translateY(0);
+        }
+
+        .soundcloud-button:disabled {
+            background: #94a3b8;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .button-icon {
+            font-size: 1.2rem;
+        }
+
+        .soundcloud-status {
+            width: 100%;
+            max-width: 500px;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+        }
+
+        .soundcloud-status.success {
+            background: #dcfce7;
+            border: 1px solid #bbf7d0;
+            color: #166534;
+        }
+
+        .soundcloud-status.error {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            color: #dc2626;
+        }
+
+        .soundcloud-status.loading {
+            background: #dbeafe;
+            border: 1px solid #bfdbfe;
+            color: #1d4ed8;
+        }
+
+        .status-message {
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+
+        .status-details {
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #bfdbfe;
+            border-radius: 50%;
+            border-top-color: #1d4ed8;
+            animation: spin 1s ease-in-out infinite;
+            margin-right: 10px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
         .footer {
             background: #f8fafc;
             padding: 30px;
@@ -243,7 +360,7 @@
                 font-size: 2rem;
             }
 
-            .metadata, .tracks-section {
+            .metadata, .tracks-section, .soundcloud-section {
                 padding: 20px;
             }
 
@@ -259,6 +376,11 @@
             .track-position {
                 margin-bottom: 10px;
                 margin-right: 0;
+            }
+
+            .soundcloud-button {
+                padding: 12px 24px;
+                font-size: 0.9rem;
             }
         }
 
@@ -276,6 +398,10 @@
             .track-item {
                 break-inside: avoid;
                 margin-bottom: 10px;
+            }
+
+            .soundcloud-section {
+                display: none;
             }
         }
     </style>
@@ -377,6 +503,18 @@
                                     </a>
                                 </div>
                             {% endif %}
+
+                            <!-- SoundCloud Widget -->
+                            <div class="soundcloud-widget" id="soundcloud-widget-{{ track.position }}" style="margin-top: 15px; min-height: 120px; width: 100%;">
+                                <div class="widget-loading" style="display: flex; align-items: center; justify-content: center; height: 120px; background: #f8f9fa; border-radius: 8px; color: #6c757d;">
+                                    <div class="loading-spinner" style="margin-right: 10px;"></div>
+                                    {% if language == 'fr' %}
+                                        Recherche sur SoundCloud...
+                                    {% else %}
+                                        Searching on SoundCloud...
+                                    {% endif %}
+                                </div>
+                            </div>
                         </li>
                     {% endfor %}
                 </ul>
@@ -393,6 +531,45 @@
             {% endif %}
         </div>
 
+        <div class="soundcloud-section">
+            <div class="soundcloud-header">
+                <h3>
+                    {% if language == 'fr' %}
+                        🎧 Importer vers SoundCloud
+                    {% else %}
+                        🎧 Import to SoundCloud
+                    {% endif %}
+                </h3>
+                <p class="soundcloud-description">
+                    {% if language == 'fr' %}
+                        Importez cette playlist directement dans votre compte SoundCloud
+                    {% else %}
+                        Import this playlist directly to your SoundCloud account
+                    {% endif %}
+                </p>
+            </div>
+
+            <div class="soundcloud-actions">
+                <button id="soundcloud-import-btn" class="soundcloud-button">
+                    <span class="button-icon">🎵</span>
+                    <span class="button-text">
+                        {% if language == 'fr' %}
+                            Importer vers SoundCloud
+                        {% else %}
+                            Import to SoundCloud
+                        {% endif %}
+                    </span>
+                </button>
+
+                <div id="soundcloud-status" class="soundcloud-status" style="display: none;">
+                    <div class="status-content">
+                        <div class="status-message"></div>
+                        <div class="status-details"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div class="footer">
             <p>
                 {% if language == 'fr' %}
@@ -403,5 +580,270 @@
             </p>
         </div>
     </div>
+
+    <script>
+        // Playlist data for SoundCloud import
+        const playlistData = {
+            metadata: {{ metadata | tojson | safe }},
+            tracks: {{ tracks | tojson | safe }}
+        };
+
+        const language = '{{ language }}';
+
+        // Messages based on language
+        const messages = {
+            fr: {
+                importing: 'Import en cours...',
+                success: 'Playlist importée avec succès !',
+                error: 'Erreur lors de l\'import',
+                notConfigured: 'SoundCloud n\'est pas configuré',
+                noTracks: 'Aucun titre à importer',
+                tracksAdded: 'titres ajoutés',
+                tracksNotFound: 'titres non trouvés',
+                viewPlaylist: 'Voir la playlist sur SoundCloud'
+            },
+            en: {
+                importing: 'Importing...',
+                success: 'Playlist imported successfully!',
+                error: 'Error during import',
+                notConfigured: 'SoundCloud is not configured',
+                noTracks: 'No tracks to import',
+                tracksAdded: 'tracks added',
+                tracksNotFound: 'tracks not found',
+                viewPlaylist: 'View playlist on SoundCloud'
+            }
+        };
+
+        const msg = messages[language] || messages.en;
+
+        // DOM elements
+        const importBtn = document.getElementById('soundcloud-import-btn');
+        const statusDiv = document.getElementById('soundcloud-status');
+        const statusMessage = statusDiv.querySelector('.status-message');
+        const statusDetails = statusDiv.querySelector('.status-details');
+
+        // Import function
+        async function importToSoundCloud() {
+            try {
+                // Disable button and show loading
+                importBtn.disabled = true;
+                showStatus('loading', msg.importing);
+
+                // Send import request to the backend
+                const response = await fetch('/api/soundcloud/import', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(playlistData)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    let details = `${result.tracks_added} ${msg.tracksAdded}`;
+                    if (result.tracks_not_found > 0) {
+                        details += `, ${result.tracks_not_found} ${msg.tracksNotFound}`;
+                    }
+
+                    if (result.playlist_url) {
+                        details += `<br><a href="${result.playlist_url}" target="_blank" style="color: inherit; text-decoration: underline;">${msg.viewPlaylist}</a>`;
+                    }
+
+                    showStatus('success', msg.success, details);
+                } else {
+                    showStatus('error', msg.error, result.error_message || '');
+                }
+
+            } catch (error) {
+                console.error('SoundCloud import error:', error);
+                showStatus('error', msg.error, error.message);
+            } finally {
+                importBtn.disabled = false;
+            }
+        }
+
+        // Show status message
+        function showStatus(type, message, details = '') {
+            statusDiv.className = `soundcloud-status ${type}`;
+            statusMessage.textContent = message;
+            statusDetails.innerHTML = details;
+            statusDiv.style.display = 'block';
+
+            if (type === 'loading') {
+                statusMessage.innerHTML = `<span class="loading-spinner"></span>${message}`;
+            }
+        }
+
+        // Event listener for import button
+        importBtn.addEventListener('click', importToSoundCloud);
+
+        // Check if tracks exist
+        if (!playlistData.tracks || playlistData.tracks.length === 0) {
+            importBtn.disabled = true;
+            importBtn.querySelector('.button-text').textContent = msg.noTracks;
+        }
+
+        // Enhanced SoundCloud search with multiple search strategies
+        async function generateSearchQueries(track) {
+            const artist = track.artist.toLowerCase();
+            const name = track.name.toLowerCase();
+
+            // Clean up common patterns
+            const cleanArtist = artist.replace(/[\[\]()]/g, '').trim();
+            const cleanName = name.replace(/[\[\]()]/g, '').replace(/\s*-\s*remaster.*$/i, '').trim();
+
+            return [
+                `${cleanArtist} ${cleanName}`,           // Standard search
+                `"${cleanArtist}" "${cleanName}"`,       // Exact match
+                `${cleanName} ${cleanArtist}`,           // Reversed order
+                cleanName,                               // Song name only
+                `${cleanArtist} ${cleanName.split(' ')[0]}`, // First word of song
+            ];
+        }
+
+        // SoundCloud widget loading functionality with backend oEmbed proxy
+        async function loadSoundCloudWidget(track) {
+            const widgetDiv = document.getElementById(`soundcloud-widget-${track.position}`);
+            if (!widgetDiv) return;
+
+            try {
+                // Generate multiple search queries
+                const searchQueries = await generateSearchQueries(track);
+                let foundTrack = null;
+
+                // Try each search query until we find something
+                for (const query of searchQueries) {
+                    try {
+                        const response = await fetch('/api/soundcloud/search', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                artist: track.artist,
+                                name: track.name,
+                                query: query
+                            })
+                        });
+
+                        if (response.ok) {
+                            const result = await response.json();
+                            if (result.success && result.soundcloud_url) {
+                                foundTrack = result;
+                                console.log(`Found track with query: "${query}"`);
+                                break;
+                            }
+                        }
+                    } catch (error) {
+                        console.debug(`Search failed for query: "${query}"`);
+                        continue;
+                    }
+                }
+
+                if (foundTrack) {
+                    // Use backend oEmbed proxy to avoid CORS issues
+                    try {
+                        const oEmbedResponse = await fetch('/api/soundcloud/oembed', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                url: foundTrack.soundcloud_url,
+                                maxwidth: '100%',
+                                maxheight: 120,
+                                auto_play: false,
+                                show_comments: false
+                            })
+                        });
+
+                        if (oEmbedResponse.ok) {
+                            const oEmbedData = await oEmbedResponse.json();
+                            if (oEmbedData.success && oEmbedData.html) {
+                                // Insert the playable SoundCloud widget and force full width
+                                let embedHtml = oEmbedData.html;
+
+                                // Force iframe to use 100% width and correct height
+                                embedHtml = embedHtml.replace(/width="[^"]*"/g, 'width="100%"');
+                                embedHtml = embedHtml.replace(/height="[^"]*"/g, 'height="120"');
+
+                                // Wrap in a container that ensures full width
+                                widgetDiv.innerHTML = `
+                                    <div style="width: 100%; height: 120px; overflow: hidden;">
+                                        ${embedHtml}
+                                    </div>
+                                `;
+
+                                // Apply additional CSS to force iframe width
+                                const iframe = widgetDiv.querySelector('iframe');
+                                if (iframe) {
+                                    iframe.style.width = '100%';
+                                    iframe.style.height = '120px';
+                                    iframe.style.minWidth = '100%';
+                                }
+
+                                console.log(`Loaded SoundCloud widget for: ${track.name}`);
+                                return;
+                            }
+                        }
+                    } catch (oEmbedError) {
+                        console.debug('oEmbed proxy failed, using fallback');
+                    }
+
+                    // Fallback: Show track info with direct link
+                    widgetDiv.innerHTML = `
+                        <div style="background: linear-gradient(135deg, #ff5500, #ff8800); border-radius: 8px; padding: 15px; color: white; text-align: center;">
+                            <div style="font-weight: 600; margin-bottom: 5px;">🎵 ${foundTrack.track_title || track.name}</div>
+                            <div style="opacity: 0.9; font-size: 0.9rem; margin-bottom: 10px;">by ${foundTrack.track_artist || track.artist}</div>
+                            <a href="${foundTrack.soundcloud_url}" target="_blank"
+                               style="background: rgba(255,255,255,0.2); color: white; text-decoration: none; padding: 8px 16px; border-radius: 20px; font-size: 0.85rem; font-weight: 500;">
+                                ${language === 'fr' ? 'Écouter sur SoundCloud' : 'Listen on SoundCloud'} ▶
+                            </a>
+                        </div>
+                    `;
+                } else {
+                    // No track found - show search link
+                    const basicQuery = `${track.artist} ${track.name}`;
+                    const searchUrl = `https://soundcloud.com/search?q=${encodeURIComponent(basicQuery)}`;
+
+                    widgetDiv.innerHTML = `
+                        <div style="background: #f8f9fa; border: 2px dashed #dee2e6; border-radius: 8px; padding: 15px; text-align: center; color: #6c757d;">
+                            <div style="margin-bottom: 10px;">🔍</div>
+                            <div style="font-size: 0.9rem; margin-bottom: 10px;">
+                                ${language === 'fr' ? 'Non trouvé sur SoundCloud' : 'Not found on SoundCloud'}
+                            </div>
+                            <a href="${searchUrl}" target="_blank"
+                               style="color: #ff5500; text-decoration: none; font-weight: 500; font-size: 0.85rem;">
+                                ${language === 'fr' ? 'Rechercher manuellement' : 'Search manually'} →
+                            </a>
+                        </div>
+                    `;
+                }
+
+            } catch (error) {
+                console.error('Error loading SoundCloud widget:', error);
+                widgetDiv.innerHTML = `
+                    <div style="background: #f8d7da; border-radius: 8px; padding: 15px; text-align: center; color: #721c24;">
+                        <div style="font-size: 0.9rem;">
+                            ${language === 'fr' ? 'Erreur de chargement' : 'Loading error'}
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        // Load all SoundCloud widgets automatically when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('Loading SoundCloud widgets for all tracks...');
+
+            // Load widgets for all tracks with staggered timing
+            playlistData.tracks.forEach((track, index) => {
+                setTimeout(() => {
+                    loadSoundCloudWidget(track);
+                }, index * 800); // 800ms delay between each request to avoid rate limiting
+            });
+        });
+    </script>
 </body>
 </html>

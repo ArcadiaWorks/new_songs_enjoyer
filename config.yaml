@@ -30,3 +30,9 @@ display:
 logging:
   level: "INFO"  # DEBUG, INFO, WARNING, ERROR
   format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+# SoundCloud integration settings
+soundcloud:
+  enabled: false  # Set to true to enable SoundCloud integration
+  playlist_name: "new_songs_enjoyer - Discovery"
+  auto_import: false  # Automatically import playlists to SoundCloud

@@ -12,6 +12,7 @@ from jinja2 import Template
 
 from config import parse_arguments, load_config, merge_config_with_args, setup_logging
 from entities import Track, Playlist, LastFmApiResponse
+from adapter import SoundCloudAdapter
 
 # Load environment variables
 load_dotenv()
@@ -106,8 +107,8 @@ def generate_html_playlist(playlist: Playlist, output_dir: Path) -> Path:
 
         template = Template(template_content)
         html_content = template.render(
-            metadata=playlist.metadata,
-            tracks=playlist.tracks,
+            metadata=playlist.metadata.to_dict(),
+            tracks=[track.to_dict() for track in playlist.tracks],
             language=playlist.metadata.language,
         )
 

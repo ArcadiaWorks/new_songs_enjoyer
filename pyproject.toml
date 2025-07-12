@@ -31,6 +31,8 @@ dependencies = [
     "python-dotenv>=1.0.0",
     "pyyaml>=6.0.0",
     "jinja2>=3.1.0",
+    "flask>=2.3.0",
+    "flask-cors>=4.0.0",
 ]
 
 [project.urls]
@@ -42,7 +44,7 @@ new-songs-enjoyer = "main:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["."]
-include = ["main.py", "config.py", "entities/", "templates/"]
+include = ["main.py", "config.py", "entities/", "templates/", "adapter/"]
 
 [tool.uv]
 dev-dependencies = []
