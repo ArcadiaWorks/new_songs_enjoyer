@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="{{ language }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% if language == 'fr' %}Playlist Musicale{% else %}Music Playlist{% endif %} - {{ metadata.date }}</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #333;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header .subtitle {
+            font-size: 1.1rem;
+            opacity: 0.9;
+            font-weight: 300;
+        }
+
+        .metadata {
+            background: #f8fafc;
+            padding: 30px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .metadata-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+        }
+
+        .metadata-item {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            border-left: 4px solid #3b82f6;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        .metadata-item .label {
+            font-size: 0.9rem;
+            color: #64748b;
+            font-weight: 500;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .metadata-item .value {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #1e293b;
+        }
+
+        .tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 5px;
+        }
+
+        .tag {
+            background: #3b82f6;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+
+        .tracks-section {
+            padding: 40px;
+        }
+
+        .tracks-header {
+            margin-bottom: 30px;
+        }
+
+        .tracks-header h2 {
+            font-size: 1.8rem;
+            font-weight: 600;
+            color: #1e293b;
+            margin-bottom: 10px;
+        }
+
+        .track-count {
+            color: #64748b;
+            font-size: 1rem;
+        }
+
+        .track-list {
+            list-style: none;
+        }
+
+        .track-item {
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            margin-bottom: 15px;
+            padding: 25px;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .track-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+            border-color: #3b82f6;
+        }
+
+        .track-item::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 4px;
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+        }
+
+        .track-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .track-position {
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            color: white;
+            width: 35px;
+            height: 35px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            margin-right: 20px;
+            font-size: 0.9rem;
+        }
+
+        .track-info {
+            flex: 1;
+        }
+
+        .track-name {
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: #1e293b;
+            margin-bottom: 5px;
+        }
+
+        .track-artist {
+            font-size: 1.1rem;
+            color: #64748b;
+            font-weight: 400;
+        }
+
+        .track-url {
+            margin-top: 15px;
+        }
+
+        .track-url a {
+            display: inline-flex;
+            align-items: center;
+            color: #3b82f6;
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 0.95rem;
+            transition: color 0.2s ease;
+        }
+
+        .track-url a:hover {
+            color: #1d4ed8;
+        }
+
+        .track-url a::before {
+            content: '🎵';
+            margin-right: 8px;
+        }
+
+        .footer {
+            background: #f8fafc;
+            padding: 30px;
+            text-align: center;
+            border-top: 1px solid #e2e8f0;
+        }
+
+        .footer p {
+            color: #64748b;
+            font-size: 0.9rem;
+        }
+
+        .generation-time {
+            font-weight: 600;
+            color: #3b82f6;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                margin: 10px;
+                border-radius: 15px;
+            }
+
+            .header {
+                padding: 30px 20px;
+            }
+
+            .header h1 {
+                font-size: 2rem;
+            }
+
+            .metadata, .tracks-section {
+                padding: 20px;
+            }
+
+            .metadata-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .track-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .track-position {
+                margin-bottom: 10px;
+                margin-right: 0;
+            }
+        }
+
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+            }
+
+            .container {
+                box-shadow: none;
+                border-radius: 0;
+            }
+
+            .track-item {
+                break-inside: avoid;
+                margin-bottom: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>
+                {% if language == 'fr' %}
+                    🎵 Playlist Musicale
+                {% else %}
+                    🎵 Music Playlist
+                {% endif %}
+            </h1>
+            <div class="subtitle">
+                {% if language == 'fr' %}
+                    Découvrez de nouveaux titres basés sur vos préférences
+                {% else %}
+                    Discover new tracks based on your preferences
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="metadata">
+            <div class="metadata-grid">
+                <div class="metadata-item">
+                    <div class="label">
+                        {% if language == 'fr' %}Date{% else %}Date{% endif %}
+                    </div>
+                    <div class="value">{{ metadata.date }}</div>
+                </div>
+
+                <div class="metadata-item">
+                    <div class="label">
+                        {% if language == 'fr' %}Titres trouvés{% else %}Tracks Found{% endif %}
+                    </div>
+                    <div class="value">{{ metadata.tracks_found }} / {{ metadata.tracks_requested }}</div>
+                </div>
+
+                <div class="metadata-item">
+                    <div class="label">
+                        {% if language == 'fr' %}Total disponible{% else %}Total Available{% endif %}
+                    </div>
+                    <div class="value">{{ metadata.total_available_tracks }}</div>
+                </div>
+
+                <div class="metadata-item">
+                    <div class="label">
+                        {% if language == 'fr' %}Tags utilisés{% else %}Tags Used{% endif %}
+                    </div>
+                    <div class="value">
+                        <div class="tags">
+                            {% for tag in metadata.tags_used %}
+                                <span class="tag">{{ tag }}</span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="tracks-section">
+            <div class="tracks-header">
+                <h2>
+                    {% if language == 'fr' %}
+                        🎶 Vos Recommandations
+                    {% else %}
+                        🎶 Your Recommendations
+                    {% endif %}
+                </h2>
+                <div class="track-count">
+                    {% if language == 'fr' %}
+                        {{ tracks|length }} titre(s) sélectionné(s)
+                    {% else %}
+                        {{ tracks|length }} track(s) selected
+                    {% endif %}
+                </div>
+            </div>
+
+            {% if tracks %}
+                <ul class="track-list">
+                    {% for track in tracks %}
+                        <li class="track-item">
+                            <div class="track-header">
+                                <div class="track-position">{{ track.position }}</div>
+                                <div class="track-info">
+                                    <div class="track-name">{{ track.name }}</div>
+                                    <div class="track-artist">{{ track.artist }}</div>
+                                </div>
+                            </div>
+                            {% if track.url %}
+                                <div class="track-url">
+                                    <a href="{{ track.url }}" target="_blank">
+                                        {% if language == 'fr' %}
+                                            Écouter sur Last.fm
+                                        {% else %}
+                                            Listen on Last.fm
+                                        {% endif %}
+                                    </a>
+                                </div>
+                            {% endif %}
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <div class="no-tracks">
+                    <p>
+                        {% if language == 'fr' %}
+                            Aucune nouvelle recommandation disponible.
+                        {% else %}
+                            No new recommendations available.
+                        {% endif %}
+                    </p>
+                </div>
+            {% endif %}
+        </div>
+
+        <div class="footer">
+            <p>
+                {% if language == 'fr' %}
+                    Généré le <span class="generation-time">{{ metadata.generated_at.replace('_', ' à ') }}</span> par new_songs_enjoyer
+                {% else %}
+                    Generated on <span class="generation-time">{{ metadata.generated_at.replace('_', ' at ') }}</span> by new_songs_enjoyer
+                {% endif %}
+            </p>
+        </div>
+    </div>
+</body>
+</html>

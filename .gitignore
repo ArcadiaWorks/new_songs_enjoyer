@@ -1,0 +1,28 @@
+# Environment variables
+.env
+
+# Output directory and files
+output/
+music_history.json
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+venv/
+env/
+.venv/
+
+# uv
+.venv/
+uv.lock
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

@@ -1,0 +1,32 @@
+# Configuration file for new_songs_enjoyer
+# This file contains application settings (API keys should be in .env file)
+
+# Music tags to search for recommendations
+default_tags:
+  - "chill"
+  - "ambient"
+  - "lofi"
+
+# Number of tracks to recommend daily
+num_tracks: 20
+
+# API settings
+api:
+  limit_per_tag: 100
+  base_url: "https://ws.audioscrobbler.com/2.0/"
+
+# Output settings
+output:
+  directory: "output"
+  history_filename: "music_history.json"
+  daily_playlist_format: "playlist_{timestamp}.json"  # Now uses detailed timestamp
+
+# Display settings
+display:
+  show_fetching_progress: true
+  language: "fr"  # fr for French messages, en for English
+
+# Logging settings
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
