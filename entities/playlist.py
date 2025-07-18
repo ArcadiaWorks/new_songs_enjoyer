@@ -18,10 +18,11 @@ class PlaylistMetadata:
     total_available_tracks: int
     api_limit_per_tag: int
     language: str
+    filtering_stats: Dict[str, Any] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert metadata to dictionary for JSON serialization."""
-        return {
+        result = {
             "generated_at": self.generated_at,
             "date": self.date,
             "tags_used": self.tags_used,
@@ -31,6 +32,12 @@ class PlaylistMetadata:
             "api_limit_per_tag": self.api_limit_per_tag,
             "language": self.language,
         }
+
+        # Include filtering statistics if available
+        if self.filtering_stats:
+            result["filtering_stats"] = self.filtering_stats
+
+        return result
 
 
 @dataclass
@@ -117,6 +124,23 @@ class Playlist:
     def get_tags_display(self) -> str:
         """Get a formatted string of tags for display."""
         return ", ".join(self.metadata.tags_used)
+
+    def set_filtering_stats(self, filter_result) -> None:
+        """Set filtering statistics from FilterResult.
+
+        Args:
+            filter_result: FilterResult object containing filtering statistics
+        """
+        if filter_result and hasattr(filter_result, "get_statistics_summary"):
+            self.metadata.filtering_stats = filter_result.get_statistics_summary()
+
+    def has_filtering_stats(self) -> bool:
+        """Check if playlist has filtering statistics."""
+        return self.metadata.filtering_stats is not None
+
+    def get_filtering_stats(self) -> Dict[str, Any]:
+        """Get filtering statistics or empty dict if none available."""
+        return self.metadata.filtering_stats or {}
 
     def __str__(self) -> str:
         """String representation of the playlist."""

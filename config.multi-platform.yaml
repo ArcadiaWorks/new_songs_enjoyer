@@ -1,0 +1,48 @@
+# Example configuration: Multi-platform filtering
+# This configuration enables filtering against both SoundCloud and Spotify
+
+# Basic settings
+default_tags:
+  - "electronic"
+  - "indie"
+  - "alternative"
+num_tracks: 25
+
+# API settings
+api:
+  limit_per_tag: 150
+  base_url: "https://ws.audioscrobbler.com/2.0/"
+
+# Output settings
+output:
+  directory: "output"
+  history_filename: "music_history.json"
+  daily_playlist_format: "playlist_{timestamp}.json"
+
+# Display settings
+display:
+  show_fetching_progress: true
+  language: "en"
+
+# Logging settings - more verbose for multi-platform debugging
+logging:
+  level: "DEBUG"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+# SoundCloud integration
+soundcloud:
+  enabled: true
+  playlist_name: "new_songs_enjoyer - Multi-Platform Discovery"
+  auto_import: false
+
+# Platform filtering: Both SoundCloud and Spotify
+platform_filtering:
+  enabled: true
+  soundcloud:
+    enabled: true
+    oauth_token: "${SOUNDCLOUD_OAUTH_TOKEN}"
+  spotify:
+    enabled: true
+    client_id: "${SPOTIFY_CLIENT_ID}"
+    client_secret: "${SPOTIFY_CLIENT_SECRET}"
+    access_token: "${SPOTIFY_ACCESS_TOKEN}"

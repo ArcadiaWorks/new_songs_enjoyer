@@ -7,12 +7,20 @@ import os
 import logging
 from pathlib import Path
 from datetime import datetime
+from typing import Optional
 from dotenv import load_dotenv
 from jinja2 import Template
 
-from config import parse_arguments, load_config, merge_config_with_args, setup_logging
-from entities import Track, Playlist, LastFmApiResponse
+from config import (
+    parse_arguments,
+    load_config,
+    merge_config_with_args,
+    setup_logging,
+    validate_platform_filtering_config,
+)
+from entities import Track, Playlist, LastFmApiResponse, FilterResult
 from adapter import SoundCloudAdapter
+from platform_filter import PlatformFilter
 
 # Load environment variables
 load_dotenv()
@@ -126,6 +134,116 @@ def generate_html_playlist(playlist: Playlist, output_dir: Path) -> Path:
         return None
 
 
+def create_platform_filter(config: dict) -> Optional[PlatformFilter]:
+    """Create PlatformFilter instance if filtering is enabled and configured.
+
+    Args:
+        config: Application configuration dictionary
+
+    Returns:
+        PlatformFilter instance or None if filtering is disabled/unavailable
+    """
+    try:
+        platform_config = config.get("platform_filtering", {})
+
+        if not platform_config.get("enabled", False):
+            logger.debug("Platform filtering is disabled in configuration")
+            return None
+
+        # Validate configuration
+        if not validate_platform_filtering_config(config):
+            logger.warning(
+                "Platform filtering configuration is invalid, skipping filtering"
+            )
+            return None
+
+        soundcloud_adapter = None
+
+        # Setup SoundCloud adapter if enabled
+        soundcloud_config = platform_config.get("soundcloud", {})
+        if soundcloud_config.get("enabled", False):
+            oauth_token = soundcloud_config.get("oauth_token")
+            if oauth_token and oauth_token.strip():
+                try:
+                    logger.debug(
+                        "Initializing SoundCloud adapter for platform filtering"
+                    )
+                    soundcloud_adapter = SoundCloudAdapter(
+                        oauth_token=oauth_token.strip()
+                    )
+
+                    # Test the adapter by validating the token
+                    try:
+                        profile = soundcloud_adapter.get_user_profile()
+                        if profile:
+                            username = profile.get("username", "Unknown")
+                            logger.info(
+                                f"SoundCloud adapter initialized successfully for user: {username}"
+                            )
+                        else:
+                            logger.warning(
+                                "SoundCloud adapter created but token validation failed"
+                            )
+                            soundcloud_adapter = None
+                    except Exception as validation_error:
+                        logger.error(
+                            f"SoundCloud token validation failed: {validation_error}"
+                        )
+                        if "401" in str(validation_error) or "403" in str(
+                            validation_error
+                        ):
+                            logger.error(
+                                "SoundCloud OAuth token is invalid or expired. Please update your token."
+                            )
+                        elif "timeout" in str(validation_error).lower():
+                            logger.warning(
+                                "SoundCloud token validation timed out, but will attempt to use adapter"
+                            )
+                        else:
+                            logger.warning(
+                                "SoundCloud token validation failed, but will attempt to use adapter"
+                            )
+
+                except ValueError as ve:
+                    logger.error(f"Invalid SoundCloud configuration: {ve}")
+                    return None
+                except Exception as e:
+                    logger.error(f"Failed to initialize SoundCloud adapter: {e}")
+                    if "token" in str(e).lower():
+                        logger.error(
+                            "Please check your SOUNDCLOUD_OAUTH_TOKEN environment variable"
+                        )
+                    return None
+            else:
+                logger.warning(
+                    "SoundCloud filtering enabled but no OAuth token provided"
+                )
+                logger.info(
+                    "To enable SoundCloud filtering, set SOUNDCLOUD_OAUTH_TOKEN environment variable"
+                )
+
+        # Create PlatformFilter instance
+        if soundcloud_adapter:
+            try:
+                platform_filter = PlatformFilter(soundcloud_adapter=soundcloud_adapter)
+                logger.info(
+                    "Platform filtering initialized successfully with SoundCloud integration"
+                )
+                return platform_filter
+            except Exception as e:
+                logger.error(f"Failed to create PlatformFilter instance: {e}")
+                return None
+        else:
+            logger.info(
+                "No platform adapters available for filtering - continuing without filtering"
+            )
+            return None
+
+    except Exception as e:
+        logger.error(f"Unexpected error creating platform filter: {e}", exc_info=True)
+        return None
+
+
 def save_playlist_files(playlist: Playlist, output_dir: Path) -> dict:
     """Save playlist to both JSON and HTML formats."""
     # Save JSON file
@@ -190,9 +308,129 @@ def create_playlist(tags: list, config: dict, output_dir: Path) -> Playlist:
 
     logger.info(f"Total new tracks found: {len(all_new_tracks)}")
 
-    # Select random tracks
-    random.shuffle(all_new_tracks)
-    selected_tracks = all_new_tracks[: config["num_tracks"]]
+    # Check if we have any tracks to work with
+    if len(all_new_tracks) == 0:
+        logger.warning("No new tracks available for the selected tags")
+
+        # Create an empty playlist with appropriate metadata
+        empty_playlist = Playlist.create(
+            tracks=[],
+            timestamp=timestamp,
+            tags=tags,
+            tracks_requested=config["num_tracks"],
+            total_available_tracks=total_fetched,
+            api_limit_per_tag=config["api"]["limit_per_tag"],
+            language=config["display"]["language"],
+        )
+
+        # Add empty filter result for consistency
+        empty_filter_result = FilterResult.create_empty([])
+        empty_filter_result.add_error("No new tracks found for the selected tags")
+        empty_playlist.set_filtering_stats(empty_filter_result)
+
+        # Don't save to history since there are no tracks
+        return empty_playlist
+
+    # Apply platform filtering before track selection
+    filter_result = None
+    platform_filter = create_platform_filter(config)
+
+    if platform_filter:
+        logger.info("Applying platform filtering to remove already liked tracks")
+
+        try:
+            filter_result = platform_filter.filter_tracks(all_new_tracks)
+
+            # Log comprehensive filtering statistics
+            stats = filter_result.get_statistics_summary()
+            logger.info(f"Platform filtering results: {stats}")
+
+            if filter_result.has_filtering_applied():
+                logger.info(
+                    f"Removed {len(filter_result.removed_tracks)} tracks already in platform libraries"
+                )
+                logger.info(f"SoundCloud matches: {filter_result.soundcloud_matches}")
+                if filter_result.spotify_matches > 0:
+                    logger.info(f"Spotify matches: {filter_result.spotify_matches}")
+
+                # Log some examples of removed tracks for transparency
+                if (
+                    filter_result.removed_tracks
+                    and len(filter_result.removed_tracks) <= 5
+                ):
+                    logger.debug("Removed tracks:")
+                    for track in filter_result.removed_tracks:
+                        logger.debug(f"  - {track.name} by {track.artist}")
+                elif len(filter_result.removed_tracks) > 5:
+                    logger.debug("Sample of removed tracks:")
+                    for track in filter_result.removed_tracks[:3]:
+                        logger.debug(f"  - {track.name} by {track.artist}")
+                    logger.debug(
+                        f"  ... and {len(filter_result.removed_tracks) - 3} more"
+                    )
+            else:
+                logger.info("No tracks were filtered - all tracks are new discoveries!")
+
+            # Handle filtering errors with user-friendly messages
+            if filter_result.errors:
+                logger.warning(
+                    f"Platform filtering completed with {len(filter_result.errors)} issues:"
+                )
+                for error in filter_result.errors:
+                    logger.warning(f"  - {error}")
+
+                # Provide helpful guidance based on error types
+                error_text = " ".join(filter_result.errors).lower()
+                if "oauth" in error_text or "token" in error_text:
+                    logger.info(
+                        "💡 Tip: Update your SoundCloud OAuth token if filtering isn't working properly"
+                    )
+                elif "timeout" in error_text:
+                    logger.info(
+                        "💡 Tip: Try again later if SoundCloud services are slow"
+                    )
+                elif "rate limit" in error_text:
+                    logger.info(
+                        "💡 Tip: Wait a few minutes before trying again due to API rate limits"
+                    )
+
+            # Use filtered tracks for selection
+            tracks_for_selection = filter_result.filtered_tracks
+
+            if not tracks_for_selection:
+                logger.warning(
+                    "All tracks were filtered out! Using original track list to ensure recommendations are available."
+                )
+                tracks_for_selection = all_new_tracks
+                # Update filter result to reflect fallback
+                filter_result = FilterResult.create_empty(all_new_tracks)
+                filter_result.add_error(
+                    "All tracks filtered - using fallback to original list"
+                )
+
+        except Exception as e:
+            logger.error(f"Platform filtering failed unexpectedly: {e}", exc_info=True)
+            logger.warning("Continuing without platform filtering due to error")
+
+            # Fallback to no filtering
+            tracks_for_selection = all_new_tracks
+            filter_result = FilterResult.create_empty(all_new_tracks)
+            filter_result.add_error(f"Platform filtering failed: {str(e)}")
+
+            # Provide user guidance
+            if "soundcloud" in str(e).lower():
+                logger.info("💡 Check your SoundCloud OAuth token configuration")
+            else:
+                logger.info("💡 Platform filtering will be skipped for this session")
+    else:
+        logger.debug("Platform filtering not available, using all tracks")
+        tracks_for_selection = all_new_tracks
+        # Create empty filter result for consistency
+        filter_result = FilterResult.create_empty(all_new_tracks)
+
+    # Select random tracks from filtered set
+    random.shuffle(tracks_for_selection)
+    selected_tracks = tracks_for_selection[: config["num_tracks"]]
 
     # Create playlist
     playlist = Playlist.create(
@@ -204,6 +442,9 @@ def create_playlist(tags: list, config: dict, output_dir: Path) -> Playlist:
         api_limit_per_tag=config["api"]["limit_per_tag"],
         language=config["display"]["language"],
     )
+
+    # Add filtering statistics to playlist metadata
+    playlist.set_filtering_stats(filter_result)
 
     # Save to history (simple format for compatibility)
     today = str(datetime.now().date())
@@ -224,6 +465,29 @@ def display_playlist(playlist: Playlist) -> None:
 
     print("=" * 50)
 
+    # Display filtering statistics if available
+    if playlist.has_filtering_stats():
+        stats = playlist.get_filtering_stats()
+        if playlist.metadata.language == "fr":
+            print("Filtrage des plateformes:")
+            print(
+                f"  • {stats['removed_count']} titres filtrés ({stats['removal_percentage']}%)"
+            )
+            if stats["soundcloud_matches"] > 0:
+                print(f"  • {stats['soundcloud_matches']} correspondances SoundCloud")
+            if stats["spotify_matches"] > 0:
+                print(f"  • {stats['spotify_matches']} correspondances Spotify")
+        else:
+            print("Platform filtering:")
+            print(
+                f"  • {stats['removed_count']} tracks filtered ({stats['removal_percentage']}%)"
+            )
+            if stats["soundcloud_matches"] > 0:
+                print(f"  • {stats['soundcloud_matches']} SoundCloud matches")
+            if stats["spotify_matches"] > 0:
+                print(f"  • {stats['spotify_matches']} Spotify matches")
+        print("=" * 50)
+
     if playlist.is_empty():
         message = (
             "Aucune nouvelle recommandation disponible."
@@ -236,7 +500,7 @@ def display_playlist(playlist: Playlist) -> None:
     for track in playlist:
         print(f"{track.position:2d}. {track}")
         if track.url:
-            print(f"    🔗 {track.url}")
+            print(f"    -> {track.url}")
 
 
 def main():

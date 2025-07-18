@@ -36,3 +36,15 @@ soundcloud:
   enabled: false  # Set to true to enable SoundCloud integration
   playlist_name: "new_songs_enjoyer - Discovery"
   auto_import: false  # Automatically import playlists to SoundCloud
+
+# Platform filtering settings
+platform_filtering:
+  enabled: true  # Enable filtering against user's liked songs from music platforms
+  soundcloud:
+    enabled: true  # Filter against SoundCloud liked tracks
+    oauth_token: "${SOUNDCLOUD_OAUTH_TOKEN}"  # OAuth token from browser cookies
+  spotify:
+    enabled: false  # Filter against Spotify liked tracks (optional)
+    client_id: "${SPOTIFY_CLIENT_ID}"  # Spotify app client ID
+    client_secret: "${SPOTIFY_CLIENT_SECRET}"  # Spotify app client secret
+    access_token: "${SPOTIFY_ACCESS_TOKEN}"  # User access token for liked songs

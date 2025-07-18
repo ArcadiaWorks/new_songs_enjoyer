@@ -1,0 +1,141 @@
+# Example configuration file for new_songs_enjoyer
+# Copy this to config.yaml and customize for your needs
+
+# ============================================================================
+# BASIC CONFIGURATION
+# ============================================================================
+
+# Music tags to search for recommendations
+# Choose tags that match your music taste
+default_tags:
+  - "chill"
+  - "ambient"
+  - "lofi"
+  # Other popular options:
+  # - "electronic"
+  # - "indie"
+  # - "jazz"
+  # - "classical"
+  # - "rock"
+  # - "hip hop"
+
+# Number of tracks to recommend daily
+num_tracks: 20
+
+# ============================================================================
+# API SETTINGS
+# ============================================================================
+
+api:
+  # Number of tracks to fetch per tag from Last.fm
+  limit_per_tag: 100
+  # Last.fm API base URL (don't change unless needed)
+  base_url: "https://ws.audioscrobbler.com/2.0/"
+
+# ============================================================================
+# OUTPUT SETTINGS
+# ============================================================================
+
+output:
+  # Directory for generated playlists
+  directory: "output"
+  # History file to track previously recommended songs
+  history_filename: "music_history.json"
+  # Playlist filename format (uses timestamp)
+  daily_playlist_format: "playlist_{timestamp}.json"
+
+# ============================================================================
+# DISPLAY SETTINGS
+# ============================================================================
+
+display:
+  # Show progress while fetching tracks
+  show_fetching_progress: true
+  # Language for messages: "fr" for French, "en" for English
+  language: "en"
+
+# ============================================================================
+# LOGGING SETTINGS
+# ============================================================================
+
+logging:
+  # Log level: DEBUG, INFO, WARNING, ERROR
+  level: "INFO"
+  # Log message format
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+# ============================================================================
+# SOUNDCLOUD INTEGRATION (Optional)
+# ============================================================================
+
+soundcloud:
+  # Enable SoundCloud playlist import feature
+  enabled: false
+  # Name for imported playlists
+  playlist_name: "new_songs_enjoyer - Discovery"
+  # Automatically import generated playlists
+  auto_import: false
+
+# ============================================================================
+# PLATFORM FILTERING CONFIGURATION
+# ============================================================================
+
+platform_filtering:
+  # Master switch for platform filtering
+  # Set to false to disable all filtering and use basic mode
+  enabled: true
+  
+  # SoundCloud filtering configuration
+  soundcloud:
+    # Enable filtering against SoundCloud liked tracks
+    enabled: true
+    # OAuth token from browser cookies (set in .env file)
+    oauth_token: "${SOUNDCLOUD_OAUTH_TOKEN}"
+  
+  # Spotify filtering configuration (optional)
+  spotify:
+    # Enable filtering against Spotify liked tracks
+    enabled: false
+    # Spotify app credentials (set in .env file)
+    client_id: "${SPOTIFY_CLIENT_ID}"
+    client_secret: "${SPOTIFY_CLIENT_SECRET}"
+    # User access token with user-library-read scope (set in .env file)
+    access_token: "${SPOTIFY_ACCESS_TOKEN}"
+
+# ============================================================================
+# EXAMPLE CONFIGURATIONS FOR DIFFERENT USE CASES
+# ============================================================================
+
+# Uncomment and modify one of these sections for specific use cases:
+
+# # Configuration for electronic music discovery
+# default_tags:
+#   - "electronic"
+#   - "techno"
+#   - "house"
+#   - "ambient"
+# num_tracks: 25
+
+# # Configuration for chill/study music
+# default_tags:
+#   - "chill"
+#   - "lofi"
+#   - "ambient"
+#   - "study"
+# num_tracks: 30
+
+# # Configuration for discovering diverse genres
+# default_tags:
+#   - "indie"
+#   - "alternative"
+#   - "experimental"
+#   - "world"
+# num_tracks: 15
+
+# # Configuration for jazz enthusiasts
+# default_tags:
+#   - "jazz"
+#   - "blues"
+#   - "fusion"
+#   - "bebop"
+# num_tracks: 20

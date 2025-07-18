@@ -549,6 +549,28 @@ def generate_form():
                         <small>Language for the generated playlist interface</small>
                     </div>
 
+                    <div class="form-group">
+                        <label for="soundcloud-token">SoundCloud OAuth Token (Optional)</label>
+                        <textarea id="soundcloud-token" name="soundcloud_token" rows="3" placeholder="Enter your SoundCloud OAuth token to filter out tracks you've already liked"></textarea>
+                        <small>
+                            <strong>🔑 How to extract your SoundCloud OAuth token from browser cookies:</strong><br>
+                            <strong>Step 1:</strong> Open <a href="https://soundcloud.com" target="_blank" style="color: #3b82f6;">SoundCloud</a> in your browser and make sure you're logged in<br>
+                            <strong>Step 2:</strong> Open Developer Tools:<br>
+                            &nbsp;&nbsp;• <strong>Chrome/Edge:</strong> Press F12 or right-click → "Inspect"<br>
+                            &nbsp;&nbsp;• <strong>Firefox:</strong> Press F12 or right-click → "Inspect Element"<br>
+                            &nbsp;&nbsp;• <strong>Safari:</strong> Enable Developer menu first, then press Cmd+Option+I<br>
+                            <strong>Step 3:</strong> Navigate to the cookies:<br>
+                            &nbsp;&nbsp;• <strong>Chrome/Edge:</strong> Application tab → Storage → Cookies → https://soundcloud.com<br>
+                            &nbsp;&nbsp;• <strong>Firefox:</strong> Storage tab → Cookies → https://soundcloud.com<br>
+                            &nbsp;&nbsp;• <strong>Safari:</strong> Storage tab → Cookies → soundcloud.com<br>
+                            <strong>Step 4:</strong> Find the cookie named <code style="background: #e2e8f0; padding: 2px 4px; border-radius: 3px;">oauth_token</code><br>
+                            <strong>Step 5:</strong> Copy the entire value (it should start with numbers and contain letters/numbers)<br>
+                            <strong>Step 6:</strong> Paste the token in the field above<br><br>
+                            <strong>⚡ What this does:</strong> Filters out tracks you've already liked on SoundCloud from your recommendations, ensuring fresh discoveries!<br>
+                            <strong>🔒 Privacy:</strong> Your token is only used during playlist generation and is not stored permanently.
+                        </small>
+                    </div>
+
                     <button type="submit" class="generate-btn">
                         🎵 Generate Playlist
                     </button>
@@ -590,7 +612,8 @@ def generate_form():
                     tags: formData.get('tags').split(',').map(tag => tag.trim()).filter(tag => tag.length > 0),
                     tracks: parseInt(formData.get('tracks')),
                     limit: parseInt(formData.get('limit')),
-                    language: formData.get('language')
+                    language: formData.get('language'),
+                    soundcloud_token: formData.get('soundcloud_token') || null
                 };
 
                 const status = document.getElementById('status');
@@ -615,12 +638,59 @@ def generate_form():
 
                     if (result.success) {
                         status.className = 'status success';
-                        status.innerHTML = `
+                        let successMessage = `
                             Playlist generated successfully!<br>
                             <a href="${result.playlist_url}" target="_blank" style="color: inherit; text-decoration: underline;">
                                 View Playlist →
                             </a>
                         `;
+
+                        // Add filtering statistics if available
+                        if (result.filtering_stats) {
+                            const stats = result.filtering_stats;
+                            successMessage += `<br><br><strong>🎯 Platform Filtering Results:</strong><br>`;
+
+                            if (stats.removed_count > 0) {
+                                successMessage += `<div style="background: #fef3c7; padding: 10px; border-radius: 6px; margin: 8px 0; border-left: 4px solid #f59e0b;">`;
+                                successMessage += `<strong>✨ Filtered for Fresh Discoveries!</strong><br>`;
+                                successMessage += `• <strong>${stats.removed_count}</strong> duplicate tracks removed (${stats.removal_percentage}%)<br>`;
+                                successMessage += `• <strong>${stats.filtered_count}</strong> fresh tracks in your playlist<br>`;
+
+                                if (stats.soundcloud_matches > 0) {
+                                    successMessage += `• <strong>${stats.soundcloud_matches}</strong> SoundCloud matches found<br>`;
+                                }
+                                if (stats.spotify_matches > 0) {
+                                    successMessage += `• <strong>${stats.spotify_matches}</strong> Spotify matches found<br>`;
+                                }
+
+                                if (stats.has_errors) {
+                                    successMessage += `• ⚠️ <strong>${stats.error_count}</strong> filtering errors occurred<br>`;
+                                }
+                                successMessage += `</div>`;
+                            } else if (params.soundcloud_token && params.soundcloud_token.trim()) {
+                                successMessage += `<div style="background: #dcfce7; padding: 10px; border-radius: 6px; margin: 8px 0; border-left: 4px solid #10b981;">`;
+                                successMessage += `<strong>🎉 All Fresh Tracks!</strong><br>`;
+                                successMessage += `• No duplicate tracks found in your SoundCloud library<br>`;
+                                successMessage += `• All <strong>${stats.filtered_count}</strong> tracks are new discoveries<br>`;
+                                successMessage += `</div>`;
+                            }
+
+                            if (stats.has_errors && stats.error_count > 0) {
+                                successMessage += `<div style="background: #fef2f2; padding: 10px; border-radius: 6px; margin: 8px 0; border-left: 4px solid #ef4444;">`;
+                                successMessage += `<strong>⚠️ Filtering Warnings:</strong><br>`;
+                                successMessage += `• Some filtering operations encountered issues<br>`;
+                                successMessage += `• Playlist may contain some tracks from your library<br>`;
+                                successMessage += `</div>`;
+                            }
+                        } else if (params.soundcloud_token && params.soundcloud_token.trim()) {
+                            successMessage += `<br><br><strong>🎯 Platform Filtering:</strong><br>`;
+                            successMessage += `<div style="background: #dbeafe; padding: 10px; border-radius: 6px; margin: 8px 0; border-left: 4px solid #3b82f6;">`;
+                            successMessage += `• SoundCloud token provided but no filtering stats available<br>`;
+                            successMessage += `• Check server logs for filtering details<br>`;
+                            successMessage += `</div>`;
+                        }
+
+                        status.innerHTML = successMessage;
                     } else {
                         status.className = 'status error';
                         status.textContent = `Error: ${result.error}`;
@@ -653,6 +723,7 @@ def generate_playlist():
         tracks = data.get("tracks", 8)
         limit = data.get("limit", 100)
         language = data.get("language", "en")
+        soundcloud_token = data.get("soundcloud_token")
 
         if not tags:
             return jsonify(
@@ -660,103 +731,225 @@ def generate_playlist():
             ), 400
 
         logger.info(
-            f"Generating playlist with tags: {tags}, tracks: {tracks}, limit: {limit}, language: {language}"
+            f"Generating playlist with tags: {tags}, tracks: {tracks}, limit: {limit}, language: {language}, "
+            f"soundcloud_token: {'provided' if soundcloud_token else 'not provided'}"
         )
 
-        # Import and run the main playlist generation logic
-        import subprocess
-        import sys
-        import tempfile
-        import yaml
+        # Import required modules for playlist generation
+        from config import get_default_config, substitute_env_variables
+        from main import create_playlist
+        from platform_filter import PlatformFilter
+        from adapter.soundcloud_adapter import SoundCloudAdapter
+        import os
 
-        # Create a temporary config file with the additional parameters
-        temp_config = {
-            "default_tags": tags,
-            "num_tracks": tracks,
-            "api": {
-                "limit_per_tag": limit,
-                "base_url": "https://ws.audioscrobbler.com/2.0/",
-            },
-            "output": {
-                "directory": "output",
-                "history_filename": "music_history.json",
-                "daily_playlist_format": "playlist_{date}.json",
-            },
-            "display": {"show_fetching_progress": True, "language": language},
-            "logging": {
-                "level": "INFO",
-                "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-            },
-        }
-
-        # Write temporary config file
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", delete=False
-        ) as temp_file:
-            yaml.dump(temp_config, temp_file)
-            temp_config_path = temp_file.name
+        # Set up temporary environment for SoundCloud token if provided
+        original_token = os.environ.get("SOUNDCLOUD_OAUTH_TOKEN")
+        if soundcloud_token and soundcloud_token.strip():
+            os.environ["SOUNDCLOUD_OAUTH_TOKEN"] = soundcloud_token.strip()
 
         try:
-            # Build command arguments
-            cmd = (
-                [
-                    sys.executable,
-                    "main.py",
-                    "--config",
-                    temp_config_path,
-                    "--tags",
-                ]
-                + tags
-                + [
-                    "--num-tracks",
-                    str(tracks),
-                ]
+            # Create config with the provided parameters
+            config = get_default_config()
+            config.update(
+                {
+                    "default_tags": tags,
+                    "num_tracks": tracks,
+                    "api": {
+                        "limit_per_tag": limit,
+                        "base_url": "https://ws.audioscrobbler.com/2.0/",
+                    },
+                    "output": {
+                        "directory": "output",
+                        "history_filename": "music_history.json",
+                        "daily_playlist_format": "playlist_{date}.json",
+                    },
+                    "display": {"show_fetching_progress": True, "language": language},
+                    "logging": {
+                        "level": "INFO",
+                        "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+                    },
+                    "platform_filtering": {
+                        "enabled": bool(soundcloud_token and soundcloud_token.strip()),
+                        "soundcloud": {
+                            "enabled": bool(
+                                soundcloud_token and soundcloud_token.strip()
+                            ),
+                            "oauth_token": soundcloud_token.strip()
+                            if soundcloud_token and soundcloud_token.strip()
+                            else None,
+                        },
+                    },
+                }
             )
 
-            # Add output directory if needed
-            if not Path("output").exists():
-                cmd.extend(["--output-dir", "output"])
+            # Substitute environment variables
+            config = substitute_env_variables(config)
 
-            # Run the playlist generation
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
-        finally:
-            # Clean up temporary config file
-            try:
-                Path(temp_config_path).unlink()
-            except:
-                pass
+            # Create SoundCloud adapter if token is provided
+            soundcloud_adapter = None
+            if soundcloud_token and soundcloud_token.strip():
+                try:
+                    soundcloud_adapter = SoundCloudAdapter.from_env()
+                    logger.info("SoundCloud adapter created for filtering")
+                except Exception as e:
+                    logger.warning(f"Could not create SoundCloud adapter: {e}")
 
-        if result.returncode == 0:
-            # Find the most recently created HTML file
-            output_dir = Path("output")
-            html_files = sorted(
-                output_dir.glob("*.html"), key=lambda x: x.stat().st_mtime, reverse=True
-            )
-
-            if html_files:
-                latest_file = html_files[0]
-                playlist_url = f"/playlist/{latest_file.name}"
-
-                return jsonify(
-                    {
-                        "success": True,
-                        "playlist_url": playlist_url,
-                        "filename": latest_file.name,
-                    }
+                # Create platform filter
+                platform_filter = (
+                    PlatformFilter(soundcloud_adapter=soundcloud_adapter)
+                    if soundcloud_adapter
+                    else None
                 )
-            else:
-                return jsonify(
-                    {"success": False, "error": "No playlist file was created"}
-                ), 500
-        else:
-            error_msg = result.stderr or result.stdout or "Unknown error occurred"
-            logger.error(f"Playlist generation failed: {error_msg}")
-            return jsonify({"success": False, "error": error_msg}), 500
 
-    except subprocess.TimeoutExpired:
-        return jsonify(
-            {"success": False, "error": "Playlist generation timed out"}
-        ), 500
+                # Generate playlist using main.py function
+                from main import ensure_output_directory, save_playlist_files
+                from pathlib import Path
+
+                output_dir = ensure_output_directory(config["output"]["directory"])
+                playlist = create_playlist(tags, config, Path(output_dir))
+
+                if playlist:
+                    # Check if playlist has tracks
+                    if len(playlist.tracks) == 0:
+                        # Handle empty playlist case
+                        error_message = "No new tracks found for the selected tags. "
+
+                        # Check if filtering stats are available to provide more context
+                        if playlist.has_filtering_stats():
+                            stats = playlist.get_filtering_stats()
+                            if stats.get("has_errors", False):
+                                error_message += (
+                                    "There were also issues with platform filtering. "
+                                )
+
+                            # Check if the tag itself returned no tracks vs. all tracks were already seen
+                            if stats.get("original_count", 0) == 0:
+                                error_message = f"The tag '{', '.join(tags)}' returned no tracks from Last.fm. "
+                                error_message += (
+                                    "This tag might not exist or have very few tracks. "
+                                )
+                            else:
+                                error_message += "All tracks for these tags have already been recommended. "
+
+                            error_message += (
+                                "Try different tags or clear your music history."
+                            )
+                        else:
+                            error_message += "All tracks for these tags may have already been recommended. Try different tags or clear your history."
+
+                        return jsonify(
+                            {
+                                "success": False,
+                                "error": error_message,
+                                "suggestion": "Try popular tags like 'indie', 'electronic', 'jazz', 'rock', 'pop', or 'alternative'",
+                                "empty_playlist": True,
+                            }
+                        ), 400
+
+                    # Save playlist files
+                    files = save_playlist_files(playlist, output_dir)
+
+                    if files and files.get("html"):
+                        html_file = files["html"]
+                        playlist_url = f"/playlist/{html_file.name}"
+
+                        # Prepare response with filtering statistics
+                        response_data = {
+                            "success": True,
+                            "playlist_url": playlist_url,
+                            "filename": html_file.name,
+                        }
+
+                        # Add filtering statistics if available
+                        if playlist.has_filtering_stats():
+                            response_data["filtering_stats"] = (
+                                playlist.get_filtering_stats()
+                            )
+
+                        return jsonify(response_data)
+                    else:
+                        return jsonify(
+                            {"success": False, "error": "Failed to save playlist files"}
+                        ), 500
+                else:
+                    return jsonify(
+                        {"success": False, "error": "Failed to create playlist"}
+                    ), 500
+                platform_filter = None
+
+                if soundcloud_adapter:
+                    try:
+                        from platform_filter import PlatformFilter
+
+                        platform_filter = PlatformFilter(
+                            soundcloud_adapter=soundcloud_adapter
+                        )
+                        logger.info("Platform filtering enabled with SoundCloud")
+
+                        # Test the platform filter with a quick validation
+                        try:
+                            # Validate that we can fetch favorites (this will cache them)
+                            favorites_count = len(
+                                platform_filter.get_soundcloud_favorites()
+                            )
+                            logger.info(
+                                f"Platform filter validated - found {favorites_count} SoundCloud favorites"
+                            )
+                        except Exception as validation_error:
+                            logger.warning(
+                                f"Platform filter validation failed: {validation_error}"
+                            )
+                            if "401" in str(validation_error) or "403" in str(
+                                validation_error
+                            ):
+                                logger.error(
+                                    "SoundCloud OAuth token is invalid or expired"
+                                )
+                                return jsonify(
+                                    {
+                                        "success": False,
+                                        "error": "Invalid SoundCloud OAuth token. Please check your token and try again.",
+                                    }
+                                ), 400
+                            elif "timeout" in str(validation_error).lower():
+                                logger.warning(
+                                    "SoundCloud validation timed out, but continuing with filtering"
+                                )
+                            else:
+                                logger.warning(
+                                    "Platform filter validation had issues, but continuing"
+                                )
+
+                    except ImportError as e:
+                        logger.error(f"Could not import PlatformFilter: {e}")
+                        return jsonify(
+                            {
+                                "success": False,
+                                "error": "Platform filtering is not available due to missing dependencies.",
+                            }
+                        ), 500
+                    except Exception as e:
+                        logger.error(f"Could not create platform filter: {e}")
+                        error_message = "Could not initialize platform filtering."
+                        if "token" in str(e).lower():
+                            error_message += (
+                                " Please check your SoundCloud OAuth token."
+                            )
+                        return jsonify({"success": False, "error": error_message}), 500
+                else:
+                    logger.debug(
+                        "No SoundCloud adapter available for platform filtering"
+                    )
+
+            # No cleanup needed since we're not using temporary files
+
+        finally:
+            # Restore original environment
+            if original_token is not None:
+                os.environ["SOUNDCLOUD_OAUTH_TOKEN"] = original_token
+            elif "SOUNDCLOUD_OAUTH_TOKEN" in os.environ:
+                del os.environ["SOUNDCLOUD_OAUTH_TOKEN"]
+
     except Exception as e:
         logger.error(f"Error generating playlist: {e}")
         return jsonify({"success": False, "error": str(e)}), 500

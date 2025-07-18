@@ -1,0 +1,45 @@
+# Example configuration: SoundCloud filtering only
+# This configuration enables filtering against SoundCloud liked tracks only
+
+# Basic settings
+default_tags:
+  - "chill"
+  - "ambient"
+  - "lofi"
+num_tracks: 20
+
+# API settings
+api:
+  limit_per_tag: 100
+  base_url: "https://ws.audioscrobbler.com/2.0/"
+
+# Output settings
+output:
+  directory: "output"
+  history_filename: "music_history.json"
+  daily_playlist_format: "playlist_{timestamp}.json"
+
+# Display settings
+display:
+  show_fetching_progress: true
+  language: "en"
+
+# Logging settings
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+# SoundCloud integration
+soundcloud:
+  enabled: true
+  playlist_name: "new_songs_enjoyer - Discovery"
+  auto_import: false
+
+# Platform filtering: SoundCloud only
+platform_filtering:
+  enabled: true
+  soundcloud:
+    enabled: true
+    oauth_token: "${SOUNDCLOUD_OAUTH_TOKEN}"
+  spotify:
+    enabled: false  # Spotify filtering disabled

@@ -489,3 +489,316 @@ class SoundCloudAdapter:
         except Exception as e:
             logger.error(f"Error getting playlist URL: {e}")
             return None
+
+    def get_user_profile(self) -> Optional[Dict[str, Any]]:
+        """Get user profile information to validate OAuth token.
+
+        Returns:
+            User profile data if successful, None otherwise
+
+        Raises:
+            requests.exceptions.RequestException: For HTTP-related errors
+        """
+        try:
+            logger.debug("Fetching user profile to validate OAuth token")
+            response = self.session.get(f"{self.BASE_URL}/me", timeout=30)
+
+            if response.status_code == 401:
+                logger.error(
+                    "SoundCloud OAuth token is invalid or expired (401 Unauthorized)"
+                )
+                raise requests.exceptions.HTTPError(
+                    "Invalid or expired OAuth token", response=response
+                )
+            elif response.status_code == 403:
+                logger.error(
+                    "SoundCloud OAuth token lacks required permissions (403 Forbidden)"
+                )
+                raise requests.exceptions.HTTPError(
+                    "Insufficient permissions for OAuth token", response=response
+                )
+            elif response.status_code == 429:
+                logger.error(
+                    "SoundCloud API rate limit exceeded (429 Too Many Requests)"
+                )
+                raise requests.exceptions.HTTPError(
+                    "Rate limit exceeded", response=response
+                )
+
+            response.raise_for_status()
+
+            profile = response.json()
+            username = profile.get("username", "Unknown")
+            user_id = profile.get("id", "Unknown")
+            logger.info(
+                f"Successfully validated OAuth token for user: {username} (ID: {user_id})"
+            )
+            return profile
+
+        except requests.exceptions.Timeout as e:
+            logger.error(f"Timeout while fetching user profile: {e}")
+            raise
+        except requests.exceptions.ConnectionError as e:
+            logger.error(f"Connection error while fetching user profile: {e}")
+            raise
+        except requests.exceptions.HTTPError as e:
+            logger.error(f"HTTP error while fetching user profile: {e}")
+            raise
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Request error while fetching user profile: {e}")
+            raise
+        except Exception as e:
+            logger.error(f"Unexpected error fetching user profile: {e}", exc_info=True)
+            return None
+
+    def get_user_liked_tracks(self, limit: int = 200) -> List[SoundCloudTrack]:
+        """Fetch user's liked songs from SoundCloud API.
+
+        Args:
+            limit: Maximum number of liked tracks to fetch (default: 200)
+
+        Returns:
+            List of SoundCloudTrack objects representing liked songs
+
+        Raises:
+            requests.exceptions.RequestException: For HTTP-related errors
+        """
+        if limit <= 0:
+            logger.warning(
+                "Invalid limit provided for liked tracks, using default of 200"
+            )
+            limit = 200
+
+        logger.info(f"Fetching user's liked tracks (limit: {limit})")
+        start_time = datetime.now()
+
+        try:
+            liked_tracks = []
+            offset = 0
+            page_size = min(
+                50, limit
+            )  # SoundCloud API typically limits to 50 per request
+            pages_fetched = 0
+            max_pages = 20  # Safety limit to prevent infinite loops
+
+            while len(liked_tracks) < limit and pages_fetched < max_pages:
+                try:
+                    params = {
+                        "limit": page_size,
+                        "offset": offset,
+                        "linked_partitioning": 1,
+                    }
+
+                    logger.debug(
+                        f"Fetching liked tracks page {pages_fetched + 1} (offset: {offset})"
+                    )
+                    response = self.session.get(
+                        f"{self.BASE_URL}/me/likes", params=params, timeout=30
+                    )
+
+                    if response.status_code == 401:
+                        logger.error(
+                            "SoundCloud OAuth token is invalid or expired while fetching liked tracks"
+                        )
+                        raise requests.exceptions.HTTPError(
+                            "Invalid or expired OAuth token", response=response
+                        )
+                    elif response.status_code == 403:
+                        logger.error(
+                            "SoundCloud OAuth token lacks permissions to access liked tracks"
+                        )
+                        raise requests.exceptions.HTTPError(
+                            "Insufficient permissions to access liked tracks",
+                            response=response,
+                        )
+                    elif response.status_code == 429:
+                        logger.warning(
+                            "SoundCloud API rate limit exceeded while fetching liked tracks"
+                        )
+                        # Wait and retry once
+                        import time
+
+                        time.sleep(5)
+                        response = self.session.get(
+                            f"{self.BASE_URL}/me/likes", params=params, timeout=30
+                        )
+                        if response.status_code == 429:
+                            raise requests.exceptions.HTTPError(
+                                "Rate limit exceeded", response=response
+                            )
+
+                    response.raise_for_status()
+                    data = response.json()
+
+                    # Handle paginated response
+                    if "collection" not in data:
+                        logger.warning(
+                            "Unexpected API response format - missing 'collection' field"
+                        )
+                        break
+
+                    collection = data["collection"]
+                    if not collection:
+                        logger.debug("No more liked tracks available")
+                        break
+
+                    tracks_processed_this_page = 0
+                    for item in collection:
+                        try:
+                            # SoundCloud likes can include tracks, playlists, etc.
+                            # We only want tracks
+                            track_data = None
+                            if item.get("kind") == "track":
+                                track_data = item
+                            elif "track" in item and item["track"]:
+                                track_data = item["track"]
+                            else:
+                                continue
+
+                            # Skip if not a valid track
+                            if not track_data or track_data.get("kind") != "track":
+                                continue
+
+                            # Validate required fields
+                            required_fields = [
+                                "id",
+                                "title",
+                                "user",
+                                "permalink_url",
+                                "duration",
+                            ]
+                            if not all(
+                                field in track_data for field in required_fields
+                            ):
+                                logger.debug(
+                                    f"Skipping track with missing required fields: {track_data.get('title', 'Unknown')}"
+                                )
+                                continue
+
+                            if (
+                                not track_data["user"]
+                                or "username" not in track_data["user"]
+                            ):
+                                logger.debug(
+                                    f"Skipping track with invalid user data: {track_data.get('title', 'Unknown')}"
+                                )
+                                continue
+
+                            sc_track = SoundCloudTrack(
+                                id=track_data["id"],
+                                title=track_data["title"],
+                                user=track_data["user"]["username"],
+                                permalink_url=track_data["permalink_url"],
+                                duration=track_data["duration"],
+                                genre=track_data.get("genre"),
+                            )
+                            liked_tracks.append(sc_track)
+                            tracks_processed_this_page += 1
+
+                            if len(liked_tracks) >= limit:
+                                break
+
+                        except Exception as e:
+                            logger.warning(f"Error processing liked track item: {e}")
+                            continue
+
+                    logger.debug(
+                        f"Processed {tracks_processed_this_page} tracks from page {pages_fetched + 1}"
+                    )
+
+                    # Check if there are more pages
+                    if "next_href" not in data or not data["next_href"]:
+                        logger.debug("No more pages available")
+                        break
+
+                    offset += page_size
+                    pages_fetched += 1
+
+                except requests.exceptions.Timeout as e:
+                    logger.error(
+                        f"Timeout while fetching liked tracks page {pages_fetched + 1}: {e}"
+                    )
+                    if pages_fetched == 0:
+                        # If first page fails, re-raise
+                        raise
+                    else:
+                        # If we have some tracks, log warning and continue
+                        logger.warning("Continuing with partial results due to timeout")
+                        break
+
+                except requests.exceptions.ConnectionError as e:
+                    logger.error(
+                        f"Connection error while fetching liked tracks page {pages_fetched + 1}: {e}"
+                    )
+                    if pages_fetched == 0:
+                        # If first page fails, re-raise
+                        raise
+                    else:
+                        # If we have some tracks, log warning and continue
+                        logger.warning(
+                            "Continuing with partial results due to connection error"
+                        )
+                        break
+
+                except requests.exceptions.HTTPError as e:
+                    logger.error(
+                        f"HTTP error while fetching liked tracks page {pages_fetched + 1}: {e}"
+                    )
+                    raise  # Always re-raise HTTP errors
+
+                except Exception as e:
+                    logger.error(
+                        f"Unexpected error while fetching liked tracks page {pages_fetched + 1}: {e}"
+                    )
+                    if pages_fetched == 0:
+                        # If first page fails, re-raise
+                        raise
+                    else:
+                        # If we have some tracks, log warning and continue
+                        logger.warning(
+                            "Continuing with partial results due to unexpected error"
+                        )
+                        break
+
+            if pages_fetched >= max_pages:
+                logger.warning(
+                    f"Reached maximum page limit ({max_pages}) while fetching liked tracks"
+                )
+
+            fetch_duration = datetime.now() - start_time
+            logger.info(
+                f"Successfully fetched {len(liked_tracks)} liked tracks in {fetch_duration.total_seconds():.2f} seconds"
+            )
+
+            if len(liked_tracks) < limit and pages_fetched > 0:
+                logger.info(
+                    f"Note: Requested {limit} tracks but only found {len(liked_tracks)} in user's liked tracks"
+                )
+
+            return liked_tracks
+
+        except requests.exceptions.RequestException:
+            # Re-raise request exceptions for proper handling upstream
+            raise
+        except Exception as e:
+            logger.error(
+                f"Unexpected error fetching user's liked tracks: {e}", exc_info=True
+            )
+            raise
+
+    def _normalize_track_for_matching(self, track: SoundCloudTrack) -> Track:
+        """Convert SoundCloudTrack to Track format for matching purposes.
+
+        Args:
+            track: SoundCloudTrack to normalize
+
+        Returns:
+            Track object with normalized data for matching
+        """
+        # Clean and normalize the track title and artist name
+        normalized_title = self._clean_search_term(track.title)
+        normalized_artist = self._clean_search_term(track.user)
+
+        return Track(
+            name=normalized_title, artist=normalized_artist, url=track.permalink_url
+        )
